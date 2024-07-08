@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "starter-fastapi-celery"
+version = "0.1.0"
+description = "Starter for FastAPI with Celery"
+authors = ["José Carlos Paiva <josepaiva94@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.111.0"
+hypercorn = "^0.17.3"
+celery = "^5.4.0"
+redis = "^5.0.7"
+
+[tool.poetry.group.dev.dependencies]
+flake8 = "^7.1.0"
+
+[build-system]
+requires = ["poetry>=1.1.0b2"]
+build-backend = "poetry.masonry.api"
