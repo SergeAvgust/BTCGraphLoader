@@ -1,16 +1,7 @@
 version: "3"
 
 services:
-  rabbitmq:
-    image: "rabbitmq"
-    env_file: docker/rabbitmq/.env
-    ports:
-      - "4369:4369"
-      - "5672:5672"
-      - "25672:25672"
-      - "15672:15672"
-    volumes:
-      - "rabbitmq_data:/var/lib/rabbitmq"
+
 
   redis:
     build: ./docker/redis
@@ -20,17 +11,19 @@ services:
     volumes:
       - "redis_data:/data"
 
-  flower:
-    image: jcpaiva/celery-flower:latest
-    env_file: docker/flower/.env
+  neo4j:
+    image: neo4j:4.3
+    container_name: neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/password
     ports:
-      - "5555:5555"
-    depends_on:
-      - rabbitmq
-      - redis
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
 
 volumes:
-  rabbitmq_data:
-    driver: local
   redis_data:
     driver: local
+  neo4j_data:
