@@ -1,4 +1,8 @@
-# query.py
+ADDRESS_TRANSACTIONS_QUERY = """
+MATCH (a:Address {address: $address})
+OPTIONAL MATCH (a)-[:INPUT|OUTPUT]->(t:Transaction)
+RETURN a, t
+"""
 
 CREATE_OR_UPDATE_BTC_TRANSACTION_BATCH = """
 UNWIND $rows AS row
