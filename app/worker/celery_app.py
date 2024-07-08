@@ -1,6 +1,7 @@
 import os
 
 from celery import Celery
+from redis import Redis
 
 
 REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
@@ -34,3 +35,11 @@ celery_app.conf.task_routes = {
     'app.worker.celery_worker.test_celery': 'test-queue'}
 
 celery_app.conf.update(task_track_started=True)
+
+redis_client = Redis(
+    host=REDIS_HOST, 
+    port=REDIS_PORT, 
+    db=0, 
+    password=REDIS_PASSWORD, 
+    username=REDIS_USERNAME
+)

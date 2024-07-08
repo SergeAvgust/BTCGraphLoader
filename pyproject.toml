@@ -10,6 +10,9 @@ fastapi = "^0.111.0"
 hypercorn = "^0.17.3"
 celery = "^5.4.0"
 redis = "^5.0.7"
+neo4j = "^5.22.0"
+requests = "^2.32.3"
+pandas = "^2.2.2"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^7.1.0"

@@ -2,13 +2,14 @@ import logging
 
 from fastapi import FastAPI, BackgroundTasks
 
-from worker.celery_app import celery_app
-
+from app.worker.celery_app import celery_app
+from app.api.routes import router
 
 log = logging.getLogger(__name__)
 
 app = FastAPI()
 
+app.include_router(router)
 
 def celery_on_message(body):
     log.warning(body)
