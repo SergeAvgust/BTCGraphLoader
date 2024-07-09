@@ -1,6 +1,7 @@
 import os
 
 from celery import Celery
+from celery.schedules import crontab
 from redis import Redis
 
 
@@ -31,10 +32,23 @@ celery_app = Celery(
         REDIS_PORT
     )
 )
-celery_app.conf.task_routes = {
-    'app.worker.celery_worker.test_celery': 'test-queue'}
 
-celery_app.conf.update(task_track_started=True)
+celery_app.autodiscover_tasks()
+
+celery_app.conf.update(
+    task_track_started=True,
+    beat_schedule={
+        'add_loading_tasks_every_day': {
+            'task': 'app.worker.celery_worker.schedule_daily_loading_tasks',
+            'schedule': crontab(minute=49, hour=2),  # Run at midnight
+        },
+        'check_download_queue': {
+            'task': 'app.worker.celery_worker.check_and_run_download_task',
+            'schedule': crontab(minute='*')
+        }
+    },
+    timezone='UTC',
+)
 
 redis_client = Redis(
     host=REDIS_HOST, 

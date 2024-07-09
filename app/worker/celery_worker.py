@@ -4,22 +4,68 @@ import gzip
 import shutil
 import os
 import pandas as pd
+from datetime import datetime, timedelta
+
+from celery.utils.log import get_task_logger
 
 from app.worker.celery_app import celery_app, redis_client
 from app.worker.celery_mixins import BaseTaskWithRetry
 from app.db.controller import db_driver
 from app.db.query import create_input, create_or_update_btc_transaction, create_output
 
-QUEUE_KEY = 'download_queue'
+QUEUE_KEY = 'download_file_queue'
+LOCK_KEY = 'download_file_lock'
+LOCK_TIMEOUT = 10 * 60  # 10 min lock timeout
+
+logger = get_task_logger(__name__)
+
+@celery_app.task
+def schedule_daily_loading_tasks():
+    yesterday = datetime.now() - timedelta(days=2) # Seems new archives are posted not at UTC:23.59, so we will load previous one
+    date_str = yesterday.strftime('%Y%m%d')
+    date_str = '20100804'
+    
+    urls = [
+        f"https://gz.blockchair.com/bitcoin/transactions/blockchair_bitcoin_transactions_{date_str}.tsv.gz",
+        f"https://gz.blockchair.com/bitcoin/inputs/blockchair_bitcoin_inputs_{date_str}.tsv.gz",
+        f"https://gz.blockchair.com/bitcoin/outputs/blockchair_bitcoin_outputs_{date_str}.tsv.gz"
+    ]
+    for url in urls:
+        download_file.delay(url)
+
+@celery_app.task()
+def download_file(url):
+    """Enqueue file download"""
+    redis_client.rpush(QUEUE_KEY, url)
+    logger.info(f"Enqueued download task for URL: {url}")
+    check_and_run_download_task.delay()
 
 
 @celery_app.task(bind=True)
-def download_file(self, url):
-    # Add the task ID to the Redis list
-    redis_client.rpush(QUEUE_KEY, self.request.id)
-    
+def check_and_run_download_task(self):
+    if acquire_lock():
+        try:
+            url = redis_client.lpop(QUEUE_KEY)
+            if url:
+                process_file_download(url.decode('utf-8'))
+        finally:
+            release_lock()
+
+def acquire_lock():
+    return redis_client.set(LOCK_KEY, "locked", nx=True, ex=LOCK_TIMEOUT)
+
+def release_lock():
+    redis_client.delete(LOCK_KEY)
+
+
+@celery_app.task(bind=True)
+def process_file_download(self, url):
+  
     try:
         response = requests.get(url, stream=True)
+        if response.status_code == 402:
+            redis_client.rpush(QUEUE_KEY, url)
+            return
         filename = url.split("/")[-1]
 
         with open(filename, "wb") as file:
@@ -27,23 +73,30 @@ def download_file(self, url):
                 file.write(chunk)
 
         result = f"{filename} downloaded"
-        unzip_file.delay(filename)  # Chain the next task
+        unzip_file.delay(filename)
+        logger.info(f"File was successfully downloaded: {filename}")
+    except Exception as e:
+        logger.error(f"The following url download was not processed properly: {url} Exception: {e}")
     finally:
-        # Remove the task ID from the Redis list
         redis_client.lrem(QUEUE_KEY, 0, self.request.id)
+        if os.path.exists(filename):
+            os.remove(filename)
     
     return result
 
 
 @celery_app.task
 def unzip_file(filename):
-    if filename.endswith('.gz'):
-        unzipped_filename = filename[:-3]
-        with gzip.open(filename, 'rb') as f_in:
-            with open(unzipped_filename, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
-        os.remove(filename)  # Remove the .gz file after unzipping
-        process_tsv.delay(unzipped_filename)  # Chain the next task
+    try:
+        if filename.endswith('.gz'):
+            unzipped_filename = filename[:-3]
+            with gzip.open(filename, 'rb') as f_in:
+                with open(unzipped_filename, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            os.remove(filename)  # Remove the .gz file after unzipping
+            process_tsv.delay(unzipped_filename)  # Chain the next task
+    except Exception as e:
+        raise
 
 
 @celery_app.task(bind=True, base=BaseTaskWithRetry)
