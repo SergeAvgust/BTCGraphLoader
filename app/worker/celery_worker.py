@@ -23,7 +23,6 @@ logger = get_task_logger(__name__)
 def schedule_daily_loading_tasks():
     yesterday = datetime.now() - timedelta(days=2) # Seems new archives are posted not at UTC:23.59, so we will load previous one
     date_str = yesterday.strftime('%Y%m%d')
-    date_str = '20100804'
     
     urls = [
         f"https://gz.blockchair.com/bitcoin/transactions/blockchair_bitcoin_transactions_{date_str}.tsv.gz",
@@ -94,7 +93,7 @@ def unzip_file(filename):
                 with open(unzipped_filename, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
             os.remove(filename)  # Remove the .gz file after unzipping
-            process_tsv.delay(unzipped_filename)  # Chain the next task
+            process_tsv.delay(unzipped_filename)
     except Exception as e:
         raise
 
