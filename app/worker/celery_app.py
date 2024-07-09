@@ -40,7 +40,7 @@ celery_app.conf.update(
     beat_schedule={
         'add_loading_tasks_every_day': {
             'task': 'app.worker.celery_worker.schedule_daily_loading_tasks',
-            'schedule': crontab(minute=49, hour=2),  # Run at midnight
+            'schedule': crontab(minute=0, hour=0),  # Run at midnight
         },
         'check_download_queue': {
             'task': 'app.worker.celery_worker.check_and_run_download_task',
