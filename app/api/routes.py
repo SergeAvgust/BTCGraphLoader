@@ -1,5 +1,6 @@
+import re
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl, field_validator
 
 from app.worker.celery_worker import download_file
 from app.db.controller import db_driver
@@ -9,6 +10,15 @@ router = APIRouter()
 
 class URLOBJ(BaseModel):
     url: str
+
+    @field_validator('url')
+    def validate_custom_url(cls, v: HttpUrl) -> HttpUrl:
+        pattern = re.compile(
+            r'https://gz.blockchair.com/bitcoin/transactions/blockchair_bitcoin_(transactions|output|input)_\d{8}\.tsv\.gz'
+        )
+        if not pattern.match(str(v)):
+            raise ValueError('URL does not match the required pattern')
+        return v
 
 @router.post("/download/")
 async def download_endpoint(obj: URLOBJ):
